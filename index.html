@@ -5,30 +5,57 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Consulta CPF</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; max-width: 920px; }
+    body { font-family: Arial, sans-serif; margin: 24px; max-width: 980px; }
     .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
     label { display:block; font-size: 12px; color:#374151; margin-bottom:6px; }
     input, button { padding: 10px; border-radius: 10px; border:1px solid #d1d5db; font-size: 14px; }
-    input { min-width: 260px; }
+    input { min-width: 260px; width: 100%; }
     button { cursor:pointer; }
-    .tabs { display:flex; gap:8px; margin-bottom: 12px; }
+    .tabs { display:flex; gap:8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab { padding:10px 12px; border:1px solid #d1d5db; border-radius: 999px; background:#fff; cursor:pointer; }
     .tab.active { background:#111827; color:#fff; border-color:#111827; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
-    .field input { width: 100%; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
     .muted { color:#6b7280; font-size: 12px; }
     .err { color:#b91c1c; }
     .ok { color:#065f46; }
     .hidden { display:none; }
     .spinner { display:inline-block; width:14px; height:14px; border:2px solid #d1d5db; border-top-color:#111827; border-radius:50%; animation:spin 1s linear infinite; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg);} }
+
+    /* Caixinhas copiáveis */
+    .fieldbox { display:flex; gap:8px; align-items:flex-end; }
+    .fieldbox .field { flex: 1; }
+    .copybtn {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .copybtn:active { transform: translateY(1px); }
+    textarea {
+      width: 100%;
+      min-height: 86px;
+      resize: vertical;
+      padding: 10px;
+      border-radius: 10px;
+      border:1px solid #d1d5db;
+      font-size: 14px;
+      font-family: Arial, sans-serif;
+    }
+    .topbar { display:flex; align-items:baseline; justify-content:space-between; gap: 12px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
 
-  <h2>Consulta por CPF</h2>
-  <p class="muted">Escolha o tipo de consulta, informe o CPF e veja o retorno em campos.</p>
+  <div class="topbar">
+    <div>
+      <h2 style="margin:0;">Consulta por CPF</h2>
+      <p class="muted" style="margin:6px 0 0;">Escolha o tipo de consulta, informe o CPF e veja o retorno em campos copiáveis.</p>
+    </div>
+  </div>
 
   <div class="card">
     <div class="tabs">
@@ -37,9 +64,9 @@
     </div>
 
     <div class="row">
-      <div>
+      <div style="min-width:320px; flex:1;">
         <label for="cpf">CPF</label>
-        <input id="cpf" placeholder="Digite o CPF" />
+        <input id="cpf" placeholder="Digite o CPF (apenas números ou com pontuação)" />
       </div>
 
       <div>
@@ -52,18 +79,20 @@
 
   <div class="card">
     <h3 style="margin-top:0;">Resultado</h3>
+
     <div id="resultEmpty" class="muted">Nenhuma consulta realizada ainda.</div>
 
     <div id="resultPretty" class="grid hidden"></div>
 
     <details style="margin-top:12px;">
       <summary class="muted">Ver JSON completo</summary>
-      <pre id="resultRaw" style="white-space:pre-wrap; background:#f9fafb; padding:12px; border-radius:10px; border:1px solid #e5e7eb;"></pre>
+      <pre id="resultRaw" style="white-space:pre-wrap; background:#f9fafb; padding:12px; border-radius:10px; border:1px solid #e5e7eb; overflow:auto;"></pre>
     </details>
   </div>
 
 <script>
-  let mode = "simples";
+  // --- Estado ---
+  let mode = "simples"; // "simples" | "completa"
 
   const tabSimples = document.getElementById("tab-simples");
   const tabCompleta = document.getElementById("tab-completa");
@@ -99,32 +128,105 @@
     resultEmpty.classList.remove("hidden");
   }
 
-  function field(labelText, value) {
+  // Normaliza o retorno do "simples" e do "completo" para um formato único
+  function normalizeResponse(data) {
+    const r = data?.result || data?.resultado || {};
+
+    return {
+      codigoPessoa: r.codigoPessoa || "",
+      nomeCompleto: r.nomeCompleto || r.nome || "",
+      genero: r.genero || "",
+      dataDeNascimento: r.dataDeNascimento || r.data_de_nascimento || "",
+      documento: r.documento || onlyDigits(cpfInput.value) || "",
+      nomeDaMae: r.nomeDaMae || "",
+      anos: (r.anos ?? ""),
+      zodiaco: (r.zodiaco ?? ""),
+      listaTelefones: Array.isArray(r.listaTelefones) ? r.listaTelefones : []
+    };
+  }
+
+  async function copyText(text) {
+    const t = (text ?? "").toString();
+    try {
+      await navigator.clipboard.writeText(t);
+      return true;
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+
+  function fieldWithCopy(labelText, value, multiline=false) {
     const wrap = document.createElement("div");
-    wrap.className = "field";
+    wrap.className = "fieldbox";
+
+    const field = document.createElement("div");
+    field.className = "field";
+
     const label = document.createElement("label");
     label.textContent = labelText;
-    const input = document.createElement("input");
-    input.readOnly = true;
-    input.value = value ?? "";
-    wrap.appendChild(label);
-    wrap.appendChild(input);
+
+    let control;
+    if (multiline) {
+      control = document.createElement("textarea");
+      control.readOnly = true;
+      control.value = value ?? "";
+    } else {
+      control = document.createElement("input");
+      control.readOnly = true;
+      control.value = value ?? "";
+    }
+
+    field.appendChild(label);
+    field.appendChild(control);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copybtn";
+    btn.textContent = "Copiar";
+    btn.addEventListener("click", async () => {
+      const ok = await copyText(control.value);
+      btn.textContent = ok ? "Copiado ✓" : "Falhou";
+      setTimeout(() => (btn.textContent = "Copiar"), 900);
+    });
+
+    wrap.appendChild(field);
+    wrap.appendChild(btn);
     return wrap;
   }
 
   function renderPretty(data) {
-    // Mapeia campos comuns das duas respostas
-    // Simples retorna: { status, return, consumed, result: { nome, data_de_nascimento, ... } }
-    const r = data?.result || data?.resultado || data;
+    const n = normalizeResponse(data);
 
-    const nome = r?.nome || r?.name || "";
-    const nasc = r?.data_de_nascimento || r?.nascimento || r?.birthdate || "";
-    const mae  = r?.nome_mae || r?.mae || r?.mother || "";
+    // Telefones em linhas
+    const phones = (n.listaTelefones || [])
+      .map(p => p?.telefoneComDDD)
+      .filter(Boolean);
+
+    const phonesText = phones.join("\n");
 
     resultPretty.innerHTML = "";
-    resultPretty.appendChild(field("Nome", nome));
-    resultPretty.appendChild(field("Data de nascimento", nasc));
-    if (mode === "completa") resultPretty.appendChild(field("Nome da mãe", mae));
+
+    resultPretty.appendChild(fieldWithCopy("Código Pessoa", n.codigoPessoa));
+    resultPretty.appendChild(fieldWithCopy("Nome Completo", n.nomeCompleto));
+    resultPretty.appendChild(fieldWithCopy("Gênero", n.genero));
+    resultPretty.appendChild(fieldWithCopy("Data de Nascimento", n.dataDeNascimento));
+    resultPretty.appendChild(fieldWithCopy("Documento (CPF)", n.documento));
+
+    // Você pediu também no simples: então mostramos sempre (no simples vem vazio)
+    resultPretty.appendChild(fieldWithCopy("Nome da Mãe", n.nomeDaMae));
+
+    resultPretty.appendChild(fieldWithCopy("Idade (anos)", String(n.anos ?? "")));
+    resultPretty.appendChild(fieldWithCopy("Zodíaco", (n.zodiaco ?? "") === null ? "" : String(n.zodiaco ?? "")));
+
+    // Lista de telefones (multilinha)
+    resultPretty.appendChild(fieldWithCopy("Lista de Telefones", phonesText, true));
 
     resultEmpty.classList.add("hidden");
     resultPretty.classList.remove("hidden");
