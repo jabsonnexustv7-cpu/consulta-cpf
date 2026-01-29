@@ -1,0 +1,57 @@
+exports.handler = async (event) => {
+  try {
+    const qs = event.queryStringParameters || {};
+    const mode = (qs.mode || "simples").toLowerCase();
+    const cpf = String(qs.cpf || "").replace(/\D+/g, "");
+
+    if (!cpf || cpf.length !== 11) {
+      return json(400, { error: "CPF inválido. Envie 11 dígitos em ?cpf=." });
+    }
+
+    const TOKEN = process.env.HUB_TOKEN;
+    const CONTRACT = process.env.HUB_CONTRACT;
+
+    if (!TOKEN) return json(500, { error: "HUB_TOKEN não configurado no Netlify." });
+
+    let upstreamUrl;
+
+    if (mode === "completa") {
+      if (!CONTRACT) return json(500, { error: "HUB_CONTRACT não configurado no Netlify." });
+
+      upstreamUrl =
+        `https://ws.hubdodesenvolvedor.com.br/v2/cadastropf/?cpf=${encodeURIComponent(cpf)}` +
+        `&token=${encodeURIComponent(TOKEN)}` +
+        `&contract=${encodeURIComponent(CONTRACT)}`;
+    } else {
+      upstreamUrl =
+        `https://ws.hubdodesenvolvedor.com.br/v2/nome_cpf/?cpf=${encodeURIComponent(cpf)}` +
+        `&token=${encodeURIComponent(TOKEN)}`;
+    }
+
+    const resp = await fetch(upstreamUrl, { headers: { Accept: "application/json" } });
+    const text = await resp.text();
+
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+    if (!resp.ok) {
+      return json(resp.status, { error: "Upstream retornou erro", status: resp.status, details: data });
+    }
+
+    return json(200, data);
+  } catch (err) {
+    return json(500, { error: "Erro interno", message: String(err && err.message ? err.message : err) });
+  }
+};
+
+function json(statusCode, body) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*"
+    },
+    body: JSON.stringify(body),
+  };
+}
