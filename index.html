@@ -1,57 +1,173 @@
-export async function handler(event) {
-  try {
-    const qs = event.queryStringParameters || {};
-    const mode = (qs.mode || "simples").toLowerCase();
-    const cpf = String(qs.cpf || "").replace(/\D+/g, "");
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Consulta CPF</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; max-width: 920px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    label { display:block; font-size: 12px; color:#374151; margin-bottom:6px; }
+    input, button { padding: 10px; border-radius: 10px; border:1px solid #d1d5db; font-size: 14px; }
+    input { min-width: 260px; }
+    button { cursor:pointer; }
+    .tabs { display:flex; gap:8px; margin-bottom: 12px; }
+    .tab { padding:10px 12px; border:1px solid #d1d5db; border-radius: 999px; background:#fff; cursor:pointer; }
+    .tab.active { background:#111827; color:#fff; border-color:#111827; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .field input { width: 100%; }
+    .muted { color:#6b7280; font-size: 12px; }
+    .err { color:#b91c1c; }
+    .ok { color:#065f46; }
+    .hidden { display:none; }
+    .spinner { display:inline-block; width:14px; height:14px; border:2px solid #d1d5db; border-top-color:#111827; border-radius:50%; animation:spin 1s linear infinite; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg);} }
+  </style>
+</head>
+<body>
+
+  <h2>Consulta por CPF</h2>
+  <p class="muted">Escolha o tipo de consulta, informe o CPF e veja o retorno em campos.</p>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" id="tab-simples" type="button">Consulta simples (sem mãe)</button>
+      <button class="tab" id="tab-completa" type="button">Consulta completa (com mãe)</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="cpf">CPF</label>
+        <input id="cpf" placeholder="Digite o CPF" />
+      </div>
+
+      <div>
+        <button id="btn" type="button">Consultar</button>
+      </div>
+
+      <div id="status" class="muted"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Resultado</h3>
+    <div id="resultEmpty" class="muted">Nenhuma consulta realizada ainda.</div>
+
+    <div id="resultPretty" class="grid hidden"></div>
+
+    <details style="margin-top:12px;">
+      <summary class="muted">Ver JSON completo</summary>
+      <pre id="resultRaw" style="white-space:pre-wrap; background:#f9fafb; padding:12px; border-radius:10px; border:1px solid #e5e7eb;"></pre>
+    </details>
+  </div>
+
+<script>
+  let mode = "simples";
+
+  const tabSimples = document.getElementById("tab-simples");
+  const tabCompleta = document.getElementById("tab-completa");
+  const cpfInput = document.getElementById("cpf");
+  const btn = document.getElementById("btn");
+  const statusEl = document.getElementById("status");
+  const resultPretty = document.getElementById("resultPretty");
+  const resultRaw = document.getElementById("resultRaw");
+  const resultEmpty = document.getElementById("resultEmpty");
+
+  function setMode(next) {
+    mode = next;
+    tabSimples.classList.toggle("active", mode === "simples");
+    tabCompleta.classList.toggle("active", mode === "completa");
+    setStatus("");
+    clearResult();
+  }
+
+  tabSimples.addEventListener("click", () => setMode("simples"));
+  tabCompleta.addEventListener("click", () => setMode("completa"));
+
+  function onlyDigits(s) { return (s || "").toString().replace(/\D+/g, ""); }
+
+  function setStatus(msg, type) {
+    statusEl.className = type || "muted";
+    statusEl.innerHTML = msg || "";
+  }
+
+  function clearResult(){
+    resultPretty.innerHTML = "";
+    resultPretty.classList.add("hidden");
+    resultRaw.textContent = "";
+    resultEmpty.classList.remove("hidden");
+  }
+
+  function field(labelText, value) {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    const input = document.createElement("input");
+    input.readOnly = true;
+    input.value = value ?? "";
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function renderPretty(data) {
+    // Mapeia campos comuns das duas respostas
+    // Simples retorna: { status, return, consumed, result: { nome, data_de_nascimento, ... } }
+    const r = data?.result || data?.resultado || data;
+
+    const nome = r?.nome || r?.name || "";
+    const nasc = r?.data_de_nascimento || r?.nascimento || r?.birthdate || "";
+    const mae  = r?.nome_mae || r?.mae || r?.mother || "";
+
+    resultPretty.innerHTML = "";
+    resultPretty.appendChild(field("Nome", nome));
+    resultPretty.appendChild(field("Data de nascimento", nasc));
+    if (mode === "completa") resultPretty.appendChild(field("Nome da mãe", mae));
+
+    resultEmpty.classList.add("hidden");
+    resultPretty.classList.remove("hidden");
+  }
+
+  async function consultar() {
+    const cpf = onlyDigits(cpfInput.value);
 
     if (!cpf || cpf.length !== 11) {
-      return json(400, { error: "CPF inválido. Envie 11 dígitos em ?cpf=." });
+      setStatus("CPF inválido. Informe 11 dígitos.", "err");
+      clearResult();
+      return;
     }
 
-    const TOKEN = process.env.HUB_TOKEN;
-    const CONTRACT = process.env.HUB_CONTRACT;
+    btn.disabled = true;
+    setStatus('<span class="spinner"></span> Consultando...', "muted");
+    clearResult();
 
-    if (!TOKEN) return json(500, { error: "HUB_TOKEN não configurado no Netlify." });
+    try {
+      const url = `/.netlify/functions/consulta?mode=${encodeURIComponent(mode)}&cpf=${encodeURIComponent(cpf)}`;
+      const res = await fetch(url);
+      const data = await res.json();
 
-    let upstreamUrl;
+      if (!res.ok) {
+        setStatus(data?.error || data?.message || "Falha na consulta.", "err");
+        return;
+      }
 
-    if (mode === "completa") {
-      if (!CONTRACT) return json(500, { error: "HUB_CONTRACT não configurado no Netlify." });
-
-      upstreamUrl =
-        `https://ws.hubdodesenvolvedor.com.br/v2/cadastropf/?cpf=${encodeURIComponent(cpf)}` +
-        `&token=${encodeURIComponent(TOKEN)}` +
-        `&contract=${encodeURIComponent(CONTRACT)}`;
-    } else {
-      upstreamUrl =
-        `https://ws.hubdodesenvolvedor.com.br/v2/nome_cpf/?cpf=${encodeURIComponent(cpf)}` +
-        `&token=${encodeURIComponent(TOKEN)}`;
+      setStatus("Consulta realizada com sucesso.", "ok");
+      renderPretty(data);
+      resultRaw.textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      setStatus("Erro ao consultar. Verifique se a Function foi publicada no Netlify.", "err");
+    } finally {
+      btn.disabled = false;
     }
-
-    const resp = await fetch(upstreamUrl, { headers: { "Accept": "application/json" } });
-    const text = await resp.text();
-
-    let data;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-    if (!resp.ok) {
-      return json(resp.status, { error: "Upstream retornou erro", status: resp.status, details: data });
-    }
-
-    return json(200, data);
-  } catch (err) {
-    return json(500, { error: "Erro interno", message: String(err?.message || err) });
   }
-}
 
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      "Access-Control-Allow-Origin": "*"
-    },
-    body: JSON.stringify(body)
-  };
-}
+  btn.addEventListener("click", consultar);
+  cpfInput.addEventListener("keydown", (e) => { if (e.key === "Enter") consultar(); });
+
+  clearResult();
+</script>
+
+</body>
+</html>
