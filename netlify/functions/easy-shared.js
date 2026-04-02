@@ -4,6 +4,12 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D+/g, '');
 }
 
+function formatCpf(value) {
+  const digits = onlyDigits(value);
+  if (digits.length !== 11) return digits;
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
 function formatDateToBr(value) {
   if (!value) return '';
 
@@ -23,13 +29,13 @@ function formatDateToBr(value) {
 
 function buildUpdatePayload(documentoAtual, incoming, updateMode) {
   const payload = {
-    documentoCliente: onlyDigits(documentoAtual),
+    documentoCliente: formatCpf(documentoAtual),
     nome: incoming?.nomeCompleto || '',
     dataNascimento: formatDateToBr(incoming?.dataDeNascimento || '')
   };
 
   if (updateMode === 'dados_documento') {
-    payload.documentoNovo = onlyDigits(incoming?.documentoNovo || '');
+    payload.documentoNovo = formatCpf(incoming?.documentoNovo || '');
   }
 
   return payload;
@@ -71,6 +77,7 @@ function verifyPreviewToken(token) {
 
 module.exports = {
   onlyDigits,
+  formatCpf,
   formatDateToBr,
   buildUpdatePayload,
   signPreviewToken,
