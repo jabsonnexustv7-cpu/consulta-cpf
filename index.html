@@ -1,12 +1,3 @@
-# Fluxo seguro: Consulta CPF + preview de atualização no Easy
-
-Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
-
----
-
-## 1) `index.html`
-
-```html
 <!doctype html>
 <html lang="pt-br">
 <head>
@@ -106,7 +97,7 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
 
   <div class="card hidden" id="easyCard">
     <h3 style="margin-top:0;">Preparar atualização no Easy</h3>
-    <p class="muted">Aqui você informa o documento atual cadastrado no Easy e escolhe se deseja só visualizar ou também trocar o documento.</p>
+    <p class="muted">Aqui você informa o documento atual cadastrado no Easy e escolhe se deseja só atualizar dados ou também trocar o documento.</p>
 
     <div class="row">
       <div style="min-width:280px; flex:1;">
@@ -185,7 +176,9 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
   tabSimples.addEventListener("click", () => setMode("simples"));
   tabCompleta.addEventListener("click", () => setMode("completa"));
 
-  function onlyDigits(s) { return (s || "").toString().replace(/\D+/g, ""); }
+  function onlyDigits(s) {
+    return (s || "").toString().replace(/\D+/g, "");
+  }
 
   function setStatus(msg, type) {
     statusEl.className = type || "muted";
@@ -217,6 +210,7 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
 
   function normalizeResponse(data) {
     const r = data?.result || data?.resultado || {};
+
     return {
       codigoPessoa: r.codigoPessoa || "",
       nomeCompleto: r.nomeCompleto || r.nome || "",
@@ -232,6 +226,7 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
 
   async function copyText(text) {
     const t = (text ?? "").toString();
+
     try {
       await navigator.clipboard.writeText(t);
       return true;
@@ -246,7 +241,7 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
     }
   }
 
-  function fieldWithCopy(labelText, value, multiline=false) {
+  function fieldWithCopy(labelText, value, multiline = false) {
     const wrap = document.createElement("div");
     wrap.className = "fieldbox";
 
@@ -270,18 +265,18 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
     field.appendChild(label);
     field.appendChild(control);
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "copybtn";
-    btn.textContent = "Copiar";
-    btn.addEventListener("click", async () => {
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "copybtn";
+    copyButton.textContent = "Copiar";
+    copyButton.addEventListener("click", async () => {
       const ok = await copyText(control.value);
-      btn.textContent = ok ? "Copiado ✓" : "Falhou";
-      setTimeout(() => (btn.textContent = "Copiar"), 900);
+      copyButton.textContent = ok ? "Copiado ✓" : "Falhou";
+      setTimeout(() => (copyButton.textContent = "Copiar"), 900);
     });
 
     wrap.appendChild(field);
-    wrap.appendChild(btn);
+    wrap.appendChild(copyButton);
     return wrap;
   }
 
@@ -311,7 +306,7 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
+      .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
 
@@ -322,24 +317,25 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
     }
 
     const rows = changes.map(item => {
-      const statusClass = item.changed ? 'warn' : 'ok';
-      const statusText = item.changed ? 'Será alterado' : 'Sem mudança';
+      const statusClass = item.changed ? "warn" : "ok";
+      const statusText = item.changed ? "Será alterado" : "Sem mudança";
+
       return `
         <tr>
           <td>${escapeHtml(item.field)}</td>
-          <td>${escapeHtml(item.currentValue ?? '')}</td>
-          <td>${escapeHtml(item.newValue ?? '')}</td>
+          <td>${escapeHtml(item.currentValue ?? "")}</td>
+          <td>${escapeHtml(item.newValue ?? "")}</td>
           <td><span class="pill ${statusClass}">${statusText}</span></td>
         </tr>
       `;
-    }).join('');
+    }).join("");
 
     previewTableWrap.innerHTML = `
       <table>
         <thead>
           <tr>
             <th>Campo</th>
-            <th>Valor atual no Easy</th>
+            <th>Valor atual no fluxo</th>
             <th>Novo valor</th>
             <th>Status</th>
           </tr>
@@ -360,7 +356,7 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
     }
 
     btn.disabled = true;
-    setStatus('<span class="spinner"></span> Consultando...', 'muted');
+    setStatus('<span class="spinner"></span> Consultando...', "muted");
     clearResult();
     clearPreview();
 
@@ -401,12 +397,12 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
 
     btnPreview.disabled = true;
     clearPreview();
-    setPreviewStatus('<span class="spinner"></span> Gerando preview...', 'muted');
+    setPreviewStatus('<span class="spinner"></span> Gerando preview...', "muted");
 
     try {
-      const res = await fetch('/.netlify/functions/easy-preview-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/.netlify/functions/easy-preview-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode,
           documentoAtual,
@@ -422,23 +418,23 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
       const data = await res.json();
 
       if (!res.ok) {
-        setPreviewStatus(data?.error || data?.message || 'Falha ao gerar preview.', 'err');
+        setPreviewStatus(data?.error || data?.message || "Falha ao gerar preview.", "err");
         return;
       }
 
       lastPreview = data;
-      previewCard.classList.remove('hidden');
+      previewCard.classList.remove("hidden");
       previewMeta.innerHTML = `
         <div class="row">
-          <div><span class="pill ok">Cliente localizado</span></div>
+          <div><span class="pill ok">Preview gerado</span></div>
           <div><span class="pill warn">Nenhuma gravação foi feita ainda</span></div>
         </div>
       `;
       renderPreviewTable(data?.changes || []);
       previewRaw.textContent = JSON.stringify(data, null, 2);
-      setPreviewStatus('Preview gerado com sucesso. Revise os dados antes de confirmar.', 'ok');
+      setPreviewStatus("Preview gerado com sucesso. Revise os dados antes de confirmar.", "ok");
     } catch (e) {
-      setPreviewStatus('Erro ao gerar preview.', 'err');
+      setPreviewStatus("Erro ao gerar preview.", "err");
     } finally {
       btnPreview.disabled = false;
     }
@@ -446,23 +442,23 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
 
   async function confirmarAtualizacao() {
     if (!lastPreview) {
-      setPreviewStatus('Gere o preview antes de confirmar.', 'err');
+      setPreviewStatus("Gere o preview antes de confirmar.", "err");
       return;
     }
 
     const hasChanged = Array.isArray(lastPreview.changes) && lastPreview.changes.some(x => x.changed);
     if (!hasChanged) {
-      setPreviewStatus('Não há alterações para confirmar.', 'warn');
+      setPreviewStatus("Não há alterações para confirmar.", "warn");
       return;
     }
 
     btnConfirm.disabled = true;
-    setPreviewStatus('<span class="spinner"></span> Confirmando atualização...', 'muted');
+    setPreviewStatus('<span class="spinner"></span> Confirmando atualização...', "muted");
 
     try {
-      const res = await fetch('/.netlify/functions/easy-confirm-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/.netlify/functions/easy-confirm-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           previewToken: lastPreview.previewToken
         })
@@ -471,447 +467,35 @@ Abaixo estão os arquivos prontos para você colocar no seu projeto Netlify.
       const data = await res.json();
 
       if (!res.ok) {
-        setPreviewStatus(data?.error || data?.message || 'Falha ao confirmar atualização.', 'err');
+        setPreviewStatus(data?.error || data?.message || "Falha ao confirmar atualização.", "err");
         return;
       }
 
-      setPreviewStatus('Atualização concluída com sucesso no Easy.', 'ok');
+      setPreviewStatus("Atualização concluída com sucesso no Easy.", "ok");
       previewMeta.innerHTML = `
         <div class="row">
           <div><span class="pill ok">Atualização confirmada</span></div>
-          <div><span class="pill ok">Log registrado</span></div>
+          <div><span class="pill ok">Flag enviada</span></div>
         </div>
       `;
       previewRaw.textContent = JSON.stringify(data, null, 2);
     } catch (e) {
-      setPreviewStatus('Erro ao confirmar atualização.', 'err');
+      setPreviewStatus("Erro ao confirmar atualização.", "err");
     } finally {
       btnConfirm.disabled = false;
     }
   }
 
-  btn.addEventListener('click', consultar);
-  cpfInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') consultar(); });
-  btnPreview.addEventListener('click', gerarPreview);
-  btnConfirm.addEventListener('click', confirmarAtualizacao);
-  btnClearPreview.addEventListener('click', clearPreview);
+  btn.addEventListener("click", consultar);
+  cpfInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") consultar();
+  });
+  btnPreview.addEventListener("click", gerarPreview);
+  btnConfirm.addEventListener("click", confirmarAtualizacao);
+  btnClearPreview.addEventListener("click", clearPreview);
 
   clearResult();
   clearPreview();
 </script>
 </body>
 </html>
-```
-
----
-
-## 2) `netlify/functions/easy-shared.js`
-
-```js
-const crypto = require('crypto');
-
-function onlyDigits(value) {
-  return String(value || '').replace(/\D+/g, '');
-}
-
-function normalizeDate(value) {
-  if (!value) return '';
-  const s = String(value).trim();
-
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
-    const [dd, mm, yyyy] = s.split('/');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    return s;
-  }
-
-  return s;
-}
-
-function formatDateToBr(value) {
-  if (!value) return '';
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [yyyy, mm, dd] = value.split('-');
-    return `${dd}/${mm}/${yyyy}`;
-  }
-  return value;
-}
-
-function buildChanges(currentClient, incoming, updateMode) {
-  const currentName = currentClient?.name || '';
-  const currentBirth = formatDateToBr(currentClient?.dataNascimento || '');
-  const currentDocumento = onlyDigits(currentClient?.documento || currentClient?.documentoCliente || '');
-
-  const newName = incoming?.nomeCompleto || '';
-  const newBirth = formatDateToBr(incoming?.dataDeNascimento || '');
-  const newDocumento = onlyDigits(incoming?.documentoNovo || '');
-
-  const changes = [
-    {
-      field: 'name',
-      currentValue: currentName,
-      newValue: newName,
-      changed: String(currentName || '') !== String(newName || '')
-    },
-    {
-      field: 'dataNascimento',
-      currentValue: currentBirth,
-      newValue: newBirth,
-      changed: String(currentBirth || '') !== String(newBirth || '')
-    }
-  ];
-
-  if (updateMode === 'dados_documento') {
-    changes.push({
-      field: 'documentoNovo',
-      currentValue: currentDocumento,
-      newValue: newDocumento,
-      changed: String(currentDocumento || '') !== String(newDocumento || '')
-    });
-  }
-
-  return changes;
-}
-
-function buildUpdatePayload(documentoAtual, incoming, updateMode) {
-  const payload = {
-    documentoCliente: onlyDigits(documentoAtual),
-    nome: incoming?.nomeCompleto || '',
-    dataNascimento: formatDateToBr(incoming?.dataDeNascimento || '')
-  };
-
-  if (updateMode === 'dados_documento') {
-    payload.documentoNovo = onlyDigits(incoming?.documentoNovo || '');
-  }
-
-  return payload;
-}
-
-function signPreviewToken(payload) {
-  const secret = process.env.PREVIEW_TOKEN_SECRET;
-  if (!secret) throw new Error('PREVIEW_TOKEN_SECRET não configurado.');
-
-  const json = JSON.stringify(payload);
-  const base64 = Buffer.from(json, 'utf8').toString('base64url');
-  const signature = crypto.createHmac('sha256', secret).update(base64).digest('base64url');
-  return `${base64}.${signature}`;
-}
-
-function verifyPreviewToken(token) {
-  const secret = process.env.PREVIEW_TOKEN_SECRET;
-  if (!secret) throw new Error('PREVIEW_TOKEN_SECRET não configurado.');
-
-  const [base64, signature] = String(token || '').split('.');
-  if (!base64 || !signature) throw new Error('Preview token inválido.');
-
-  const expected = crypto.createHmac('sha256', secret).update(base64).digest('base64url');
-  if (signature !== expected) throw new Error('Assinatura do preview token inválida.');
-
-  const json = Buffer.from(base64, 'base64url').toString('utf8');
-  return JSON.parse(json);
-}
-
-module.exports = {
-  onlyDigits,
-  normalizeDate,
-  formatDateToBr,
-  buildChanges,
-  buildUpdatePayload,
-  signPreviewToken,
-  verifyPreviewToken
-};
-```
-
----
-
-## 3) `netlify/functions/easy-preview-update.js`
-
-```js
-const {
-  onlyDigits,
-  buildUpdatePayload,
-  signPreviewToken
-} = require('./easy-shared');
-
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8'
-    },
-    body: JSON.stringify(body)
-  };
-}
-
-exports.handler = async (event) => {
-  try {
-    if (event.httpMethod !== 'POST') {
-      return json(405, { error: 'Método não permitido.' });
-    }
-
-    const body = JSON.parse(event.body || '{}');
-    const documentoAtual = onlyDigits(body?.documentoAtual);
-    const updateMode = body?.updateMode === 'dados_documento' ? 'dados_documento' : 'dados';
-    const consulta = body?.consulta || {};
-
-    if (!documentoAtual || documentoAtual.length !== 11) {
-      return json(400, { error: 'Documento atual inválido.' });
-    }
-
-    if (!consulta?.nomeCompleto) {
-      return json(400, { error: 'Nome retornado da consulta é obrigatório.' });
-    }
-
-    if (!consulta?.dataDeNascimento) {
-      return json(400, { error: 'Data de nascimento retornada da consulta é obrigatória.' });
-    }
-
-    if (updateMode === 'dados_documento') {
-      const documentoNovo = onlyDigits(consulta?.documentoNovo);
-      if (!documentoNovo || documentoNovo.length !== 11) {
-        return json(400, { error: 'Documento novo inválido.' });
-      }
-    }
-
-    const updatePayload = buildUpdatePayload(documentoAtual, {
-      nomeCompleto: consulta.nomeCompleto,
-      dataDeNascimento: consulta.dataDeNascimento,
-      documentoNovo: consulta.documentoNovo
-    }, updateMode);
-
-    const previewToken = signPreviewToken({
-      iat: Date.now(),
-      exp: Date.now() + (10 * 60 * 1000),
-      documentoAtual,
-      updateMode,
-      updatePayload
-    });
-
-    const changes = [
-      {
-        field: 'name',
-        currentValue: '(não consultado no Easy)',
-        newValue: updatePayload.nome,
-        changed: true
-      },
-      {
-        field: 'dataNascimento',
-        currentValue: '(não consultado no Easy)',
-        newValue: updatePayload.dataNascimento,
-        changed: true
-      }
-    ];
-
-    if (updateMode === 'dados_documento') {
-      changes.push({
-        field: 'documentoNovo',
-        currentValue: documentoAtual,
-        newValue: updatePayload.documentoNovo,
-        changed: documentoAtual !== updatePayload.documentoNovo
-      });
-    }
-
-    return json(200, {
-      ok: true,
-      lookupMode: 'sem-leitura-do-easy',
-      message: 'Preview gerado sem leitura prévia do cadastro no Easy.',
-      currentClient: {
-        documentoCliente: documentoAtual
-      },
-      updatePayload,
-      changes,
-      previewToken
-    });
-  } catch (error) {
-    return json(error.statusCode || 500, {
-      error: error.message || 'Erro interno ao gerar preview.',
-      details: error.payload || null
-    });
-  }
-};
-```
-
----
-
-## 4) `netlify/functions/easy-confirm-update.js`
-
-```js
-const {
-  verifyPreviewToken
-} = require('./easy-shared');
-
-const EASY_BASE_URL = process.env.EASY_BASE_URL || 'https://easy.srv.br/api/mhnet/1';
-const EASY_TOKEN = process.env.EASY_TOKEN;
-const ENABLE_TENTOU_OUTRO_DOC_FLAG = String(process.env.ENABLE_TENTOU_OUTRO_DOC_FLAG || 'true') === 'true';
-
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8'
-    },
-    body: JSON.stringify(body)
-  };
-}
-
-async function easyRequest(path, options = {}) {
-  if (!EASY_TOKEN) {
-    throw new Error('EASY_TOKEN não configurado.');
-  }
-
-  const response = await fetch(`${EASY_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${EASY_TOKEN}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
-
-  const text = await response.text();
-  let data;
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { raw: text };
-  }
-
-  if (!response.ok) {
-    const message = data?.message || data?.error || `Falha no Easy (${response.status})`;
-    const err = new Error(message);
-    err.statusCode = response.status;
-    err.payload = data;
-    throw err;
-  }
-
-  return data;
-}
-
-async function updateClient(updatePayload) {
-  return easyRequest('/cliente/editar', {
-    method: 'POST',
-    body: JSON.stringify(updatePayload)
-  });
-}
-
-async function markTentouOutroDoc(documentoCliente) {
-  return easyRequest('/tentouOutroDoc/editar', {
-    method: 'POST',
-    body: JSON.stringify({
-      documentoCliente
-    })
-  });
-}
-
-exports.handler = async (event) => {
-  try {
-    if (event.httpMethod !== 'POST') {
-      return json(405, { error: 'Método não permitido.' });
-    }
-
-    const body = JSON.parse(event.body || '{}');
-    const previewToken = body?.previewToken;
-    if (!previewToken) {
-      return json(400, { error: 'Preview token é obrigatório.' });
-    }
-
-    const preview = verifyPreviewToken(previewToken);
-    if (!preview?.exp || Date.now() > preview.exp) {
-      return json(400, { error: 'Preview expirado. Gere um novo preview.' });
-    }
-
-    const response = await updateClient(preview.updatePayload);
-
-    let tentouOutroDocResponse = null;
-    if (ENABLE_TENTOU_OUTRO_DOC_FLAG) {
-      tentouOutroDocResponse = await markTentouOutroDoc(preview.documentoAtual);
-    }
-
-    return json(200, {
-      ok: true,
-      message: 'Cliente atualizado com sucesso no Easy.',
-      sentPayload: preview.updatePayload,
-      easyResponse: response,
-      tentouOutroDocFlag: tentouOutroDocResponse,
-      audit: {
-        confirmedAt: new Date().toISOString(),
-        documentoAtual: preview.documentoAtual,
-        updateMode: preview.updateMode
-      }
-    });
-  } catch (error) {
-    return json(error.statusCode || 500, {
-      error: error.message || 'Erro interno ao confirmar atualização.',
-      details: error.payload || null
-    });
-  }
-};
-```
-
----
-
-## 5) Variáveis do Netlify
-
-```bash
-EASY_BASE_URL=https://easy.srv.br/api/mhnet/1
-EASY_TOKEN=SEU_TOKEN_BEARER_AQUI
-PREVIEW_TOKEN_SECRET=UMA_CHAVE_FORTE_E_LONGA_AQUI
-```
-
----
-
-## 6) Como fica com os endpoints reais que você informou
-
-Você confirmou que:
-
-* `/cliente/editar` altera os dados do cliente no Easy
-* `/tentouOutroDoc/editar` apenas grava um flag para identificar clientes alterados
-
-Então o fluxo correto fica assim:
-
-1. O site consulta o CPF.
-2. O operador informa o `documentoCliente` atual no Easy.
-3. A function de preview apenas monta o payload final, sem tentar ler o cadastro atual no Easy.
-4. Ao confirmar:
-
-   * primeiro chama `/cliente/editar`
-   * depois chama `/tentouOutroDoc/editar` para marcar o cliente no filtro
-
-Isso elimina a etapa de leitura prévia no Easy e usa o endpoint de flag da forma correta.
-
----
-
-## 7) Por que seu JSON no print deu inválido
-
-Nos seus prints, o corpo estava sendo montado com variáveis tipo `TxtCPF`, `TxtNomeCompletoAlternativo`, `TxtCpfAlternativo` e `TxtNascimentoAlternativo`. Isso está falhando no construtor visual porque as variáveis não estão resolvidas naquele contexto. Em vez de mandar esse JSON bruto do front visual, o melhor é deixar o front chamar a Netlify Function e ela montar o payload final no backend.
-
----
-
-## 8) Fluxo final
-
-1. Digita CPF.
-2. Site consulta e mostra resultado.
-3. Operador informa o documento atual no Easy.
-4. Clica em `Gerar preview`.
-5. Sistema compara atual x novo.
-6. Clica em `Confirmar atualização`.
-7. Só então envia para `/cliente/editar`.
-
----
-
-## 9) Ajuste opcional que eu recomendo
-
-Se você quiser, no próximo passo eu posso transformar isso em uma versão já adaptada exatamente ao seu deploy, com:
-
-* `netlify.toml`
-* estrutura de pastas
-* tratamento do retorno real do Easy
-* logs mais completos
-* bloqueio para impedir troca de documento quando o nome divergir muito
-* tela com comparação visual melhor
-
-```
-```
