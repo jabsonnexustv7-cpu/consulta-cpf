@@ -62,7 +62,8 @@ async function markTentouOutroDoc(documentoCliente) {
   return easyRequest('/tentouOutroDoc/editar', {
     method: 'POST',
     body: JSON.stringify({
-      documentoCliente
+      documentoCliente,
+      tentouOutroDocumento: 'Sim'
     })
   });
 }
@@ -89,9 +90,10 @@ exports.handler = async (event) => {
     const response = await updateClient(preview.updatePayload);
 
     let tentouOutroDocResponse = null;
+
     if (ENABLE_TENTOU_OUTRO_DOC_FLAG) {
       tentouOutroDocResponse = await markTentouOutroDoc(
-        preview.documentoAtual
+        preview.updatePayload.documentoCliente
       );
     }
 
