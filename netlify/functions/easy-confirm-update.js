@@ -16,6 +16,10 @@ function json(statusCode, body) {
   };
 }
 
+function sanitizeDocumento(value) {
+  return String(value || '').trim();
+}
+
 async function easyRequest(path, options = {}) {
   if (!EASY_TOKEN) {
     throw new Error('EASY_TOKEN não configurado.');
@@ -59,13 +63,31 @@ async function updateClient(updatePayload) {
 }
 
 async function markTentouOutroDoc(documentoCliente) {
-  return easyRequest('/tentouOutroDoc/editar', {
+  const payload = {
+    documentoCliente: sanitizeDocumento(documentoCliente)
+  };
+
+  console.log('[tentouOutroDoc] payload enviado:', payload);
+
+  const response = await easyRequest('/tentouOutroDoc/editar', {
     method: 'POST',
-    body: JSON.stringify({
-      documentoCliente,
-      tentouOutroDocumento: 'Sim'
-    })
+    body: JSON.stringify(payload)
   });
+
+  console.log('[tentouOutroDoc] resposta recebida:', response);
+
+  if (response?.success === false) {
+    const err = new Error(
+      response?.message || 'Falha ao marcar tentouOutroDoc no Easy.'
+    );
+    err.payload = response;
+    throw err;
+  }
+
+  return {
+    payloadSent: payload,
+    response
+  };
 }
 
 exports.handler = async (event) => {
@@ -87,29 +109,54 @@ exports.handler = async (event) => {
       return json(400, { error: 'Preview expirado. Gere um novo preview.' });
     }
 
-    const response = await updateClient(preview.updatePayload);
+    const documentoAtual = sanitizeDocumento(preview?.documentoAtual);
+    const documentoDoPayload = sanitizeDocumento(
+      preview?.updatePayload?.documentoCliente
+    );
 
-    let tentouOutroDocResponse = null;
+    console.log('[preview] documentoAtual:', documentoAtual);
+    console.log('[preview] documentoDoPayload:', documentoDoPayload);
+    console.log('[preview] updateMode:', preview?.updateMode);
+    console.log('[preview] updatePayload:', preview?.updatePayload);
+
+    let tentouOutroDocFlag = null;
 
     if (ENABLE_TENTOU_OUTRO_DOC_FLAG) {
-      tentouOutroDocResponse = await markTentouOutroDoc(
-        preview.updatePayload.documentoCliente
-      );
+      const documentoParaFlag = documentoAtual || documentoDoPayload;
+
+      if (!documentoParaFlag) {
+        throw new Error(
+          'Não foi possível identificar o documento para marcar tentouOutroDoc.'
+        );
+      }
+
+      tentouOutroDocFlag = await markTentouOutroDoc(documentoParaFlag);
     }
+
+    const easyResponse = await updateClient(preview.updatePayload);
+
+    console.log('[cliente/editar] resposta recebida:', easyResponse);
 
     return json(200, {
       ok: true,
       message: 'Cliente atualizado com sucesso no Easy.',
       sentPayload: preview.updatePayload,
-      easyResponse: response,
-      tentouOutroDocFlag: tentouOutroDocResponse,
+      easyResponse,
+      tentouOutroDocFlag,
       audit: {
         confirmedAt: new Date().toISOString(),
-        documentoAtual: preview.documentoAtual,
-        updateMode: preview.updateMode
+        documentoAtual,
+        documentoDoPayload,
+        updateMode: preview?.updateMode
       }
     });
   } catch (error) {
+    console.error('[confirm-update] erro:', {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      payload: error?.payload || null
+    });
+
     return json(error.statusCode || 500, {
       error: error.message || 'Erro interno ao confirmar atualização.',
       details: error.payload || null
