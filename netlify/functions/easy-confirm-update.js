@@ -16,8 +16,16 @@ function json(statusCode, body) {
   };
 }
 
-function sanitizeDocumento(value) {
+function asString(value) {
   return String(value || '').trim();
+}
+
+function onlyDigits(value) {
+  return asString(value).replace(/\D/g, '');
+}
+
+function uniqueNonEmpty(values) {
+  return [...new Set(values.map(asString).filter(Boolean))];
 }
 
 async function easyRequest(path, options = {}) {
@@ -35,6 +43,154 @@ async function easyRequest(path, options = {}) {
   });
 
   const text = await response.text();
+
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    data
+  };
+}
+
+async function updateClient(updatePayload) {
+  const result = await easyRequest('/cliente/editar', {
+    method: 'POST',
+    body: JSON.stringify(updatePayload)
+  });
+
+  if (!result.ok) {
+    const message =
+      result.data?.message ||
+      result.data?.error ||
+      `Falha no Easy (${result.status})`;
+    const err = new Error(message);
+    err.statusCode = result.status;
+    err.payload = result.data;
+    throw err;
+  }
+
+  return result.data;
+}
+
+async function tryMarkTentouOutroDoc(documentoCliente) {
+  const payload = { documentoCliente };
+
+  const result = await easyRequest('/tentouOutroDoc/editar', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  return {
+    payload,
+    status: result.status,
+    okHttp: result.ok,
+    response: result.data
+  };
+}
+
+async function markTentouOutroDocWithDiagnostics(preview) {
+  const documentoAtual = asString(preview?.documentoAtual);
+  const documentoPayload = asString(preview?.updatePayload?.documentoCliente);
+
+  const candidatos = uniqueNonEmpty([
+    documentoAtual,
+    onlyDigits(documentoAtual),
+    documentoPayload,
+    onlyDigits(documentoPayload)
+  ]);
+
+  const attempts = [];
+
+  for (const documento of candidatos) {
+    try {
+      const result = await tryMarkTentouOutroDoc(documento);
+      attempts.push({
+        success: result.okHttp,
+        ...result
+      });
+
+      if (result.okHttp) {
+        return {
+          success: true,
+          selectedDocumento: documento,
+          attempts
+        };
+      }
+    } catch (error) {
+      attempts.push({
+        success: false,
+        payload: { documentoCliente: documento },
+        status: error?.statusCode || 500,
+        response: error?.payload || { error: error.message }
+      });
+    }
+  }
+
+  return {
+    success: false,
+    selectedDocumento: null,
+    attempts
+  };
+}
+
+exports.handler = async (event) => {
+  try {
+    if (event.httpMethod !== 'POST') {
+      return json(405, { error: 'Método não permitido.' });
+    }
+
+    const body = JSON.parse(event.body || '{}');
+    const previewToken = body?.previewToken;
+
+    if (!previewToken) {
+      return json(400, { error: 'Preview token é obrigatório.' });
+    }
+
+    const preview = verifyPreviewToken(previewToken);
+
+    if (!preview?.exp || Date.now() > preview.exp) {
+      return json(400, { error: 'Preview expirado. Gere um novo preview.' });
+    }
+
+    let tentouOutroDocFlag = {
+      skipped: true,
+      reason: 'Flag desabilitada'
+    };
+
+    if (ENABLE_TENTOU_OUTRO_DOC_FLAG) {
+      tentouOutroDocFlag = await markTentouOutroDocWithDiagnostics(preview);
+    }
+
+    const easyResponse = await updateClient(preview.updatePayload);
+
+    return json(200, {
+      ok: true,
+      message: 'Cliente atualizado com sucesso no Easy.',
+      sentPayload: preview.updatePayload,
+      easyResponse,
+      tentouOutroDocFlag,
+      audit: {
+        confirmedAt: new Date().toISOString(),
+        documentoAtual: asString(preview?.documentoAtual),
+        documentoPayload: asString(preview?.updatePayload?.documentoCliente),
+        documentoAtualDigits: onlyDigits(preview?.documentoAtual),
+        documentoPayloadDigits: onlyDigits(preview?.updatePayload?.documentoCliente),
+        updateMode: preview?.updateMode
+      }
+    });
+  } catch (error) {
+    return json(error.statusCode || 500, {
+      error: error.message || 'Erro interno ao confirmar atualização.',
+      details: error.payload || null
+    });
+  }
+};  const text = await response.text();
 
   let data;
   try {
