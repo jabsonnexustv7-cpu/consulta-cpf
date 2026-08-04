@@ -60,7 +60,7 @@
   <div class="topbar">
     <div>
       <h2 style="margin:0;">Consulta por CPF</h2>
-      <p class="muted" style="margin:6px 0 0;">Consulte o CPF, visualize os dados retornados e prepare uma atualização segura no Easy com confirmação antes de gravar.</p>
+      <p class="muted" style="margin:6px 0 0;">Consulte o CPF, visualize os dados retornados e prepare uma atualização segura no CRM com confirmação antes de gravar.</p>
     </div>
   </div>
 
@@ -96,13 +96,13 @@
   </div>
 
   <div class="card hidden" id="easyCard">
-    <h3 style="margin-top:0;">Preparar atualização no Easy</h3>
-    <p class="muted">Aqui você informa o documento atual cadastrado no Easy e escolhe se deseja só atualizar dados ou também trocar o documento.</p>
+    <h3 style="margin-top:0;">Preparar atualização no CRM</h3>
+    <p class="muted">Aqui você informa o documento atual cadastrado no CRM e escolhe se deseja só atualizar dados ou também trocar o documento.</p>
 
     <div class="row">
       <div style="min-width:280px; flex:1;">
-        <label for="easyDocumentoAtual">Documento atual no Easy</label>
-        <input id="easyDocumentoAtual" placeholder="CPF atualmente cadastrado no Easy" />
+        <label for="easyDocumentoAtual">Documento atual no CRM</label>
+        <input id="easyDocumentoAtual" placeholder="CPF atualmente cadastrado no CRM" />
       </div>
 
       <div style="min-width:280px; flex:1;">
@@ -335,7 +335,7 @@
         <thead>
           <tr>
             <th>Campo</th>
-            <th>Valor atual no fluxo</th>
+            <th>Valor atual no CRM</th>
             <th>Novo valor</th>
             <th>Status</th>
           </tr>
@@ -391,7 +391,7 @@
     }
 
     if (!documentoAtual || documentoAtual.length !== 11) {
-      setPreviewStatus("Informe o documento atual do cliente no Easy com 11 dígitos.", "err");
+      setPreviewStatus("Informe o documento atual do cliente no CRM com 11 dígitos.", "err");
       return;
     }
 
@@ -471,11 +471,11 @@
         return;
       }
 
-      setPreviewStatus("Atualização concluída com sucesso no Easy.", "ok");
+      setPreviewStatus("Atualização concluída com sucesso no CRM.", "ok");
       previewMeta.innerHTML = `
         <div class="row">
           <div><span class="pill ok">Atualização confirmada</span></div>
-          <div><span class="pill ok">Flag enviada</span></div>
+          <div><span class="pill ok">Pré-venda sinalizada</span></div>
         </div>
       `;
       previewRaw.textContent = JSON.stringify(data, null, 2);
