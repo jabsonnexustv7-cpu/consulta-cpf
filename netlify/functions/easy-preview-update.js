@@ -68,13 +68,13 @@ exports.handler = async (event) => {
     const changes = [
       {
         field: 'name',
-        currentValue: '(não consultado no Easy)',
+        currentValue: '(não consultado no CRM)',
         newValue: updatePayload.nome,
         changed: true
       },
       {
         field: 'dataNascimento',
-        currentValue: '(não consultado no Easy)',
+        currentValue: '(não consultado no CRM)',
         newValue: updatePayload.dataNascimento,
         changed: true
       }
@@ -91,8 +91,8 @@ exports.handler = async (event) => {
 
     return json(200, {
       ok: true,
-      lookupMode: 'sem-leitura-do-easy',
-      message: 'Preview gerado sem leitura prévia do cadastro no Easy.',
+      lookupMode: 'sem-leitura-do-crm',
+      message: 'Preview gerado sem leitura prévia do cadastro no CRM.',
       currentClient: {
         documentoCliente: documentoAtual
       },
