@@ -1,10 +1,11 @@
 const { verifyPreviewToken } = require('./easy-shared');
 
-const EASY_BASE_URL =
-  process.env.EASY_BASE_URL || 'https://easy.srv.br/api/mhnet/1';
-const EASY_TOKEN = process.env.EASY_TOKEN;
-const ENABLE_TENTOU_OUTRO_DOC_FLAG =
-  String(process.env.ENABLE_TENTOU_OUTRO_DOC_FLAG || 'true') === 'true';
+const CRM_API_URL = String(
+  process.env.CRM_API_URL ||
+    'https://webturbo-crm-api-964927461432.southamerica-east1.run.app'
+).replace(/\/$/, '');
+const CRM_INTEGRATION_TOKEN = process.env.CRM_INTEGRATION_TOKEN;
+const CRM_TIMEOUT_MS = 12000;
 
 function json(statusCode, body) {
   return {
@@ -16,55 +17,59 @@ function json(statusCode, body) {
   };
 }
 
-async function easyRequest(path, options = {}) {
-  if (!EASY_TOKEN) {
-    throw new Error('EASY_TOKEN não configurado.');
+async function crmRequest(path, options = {}) {
+  if (!CRM_INTEGRATION_TOKEN) {
+    throw new Error('CRM_INTEGRATION_TOKEN não configurado no Netlify.');
   }
 
-  const response = await fetch(`${EASY_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${EASY_TOKEN}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CRM_TIMEOUT_MS);
 
-  const text = await response.text();
-
-  let data;
   try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { raw: text };
+    const response = await fetch(`${CRM_API_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${CRM_INTEGRATION_TOKEN}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(options.headers || {})
+      }
+    });
+
+    const text = await response.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw: text };
+    }
+
+    if (!response.ok) {
+      const message =
+        data?.message ||
+        data?.error?.message ||
+        data?.error ||
+        `Falha no CRM (${response.status})`;
+      const error = new Error(message);
+      error.statusCode = response.status;
+      error.payload = data;
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error(
+        'O CRM demorou mais que o esperado para concluir a atualização.'
+      );
+      timeoutError.statusCode = 504;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    const message =
-      data?.message || data?.error || `Falha no Easy (${response.status})`;
-    const err = new Error(message);
-    err.statusCode = response.status;
-    err.payload = data;
-    throw err;
-  }
-
-  return data;
-}
-
-async function updateClient(updatePayload) {
-  return easyRequest('/cliente/editar', {
-    method: 'POST',
-    body: JSON.stringify(updatePayload)
-  });
-}
-
-async function markTentouOutroDoc(documentoCliente) {
-  return easyRequest('/tentouOutroDoc/editar', {
-    method: 'POST',
-    body: JSON.stringify({
-      documentoCliente
-    })
-  });
 }
 
 exports.handler = async (event) => {
@@ -86,26 +91,34 @@ exports.handler = async (event) => {
       return json(400, { error: 'Preview expirado. Gere um novo preview.' });
     }
 
-    const response = await updateClient(preview.updatePayload);
-
-    let tentouOutroDocResponse = null;
-
-    if (ENABLE_TENTOU_OUTRO_DOC_FLAG) {
-      tentouOutroDocResponse = await markTentouOutroDoc(
-        preview.updatePayload.documentoCliente
-      );
-    }
+    const updatePayload = preview.updatePayload || {};
+    const crmResponse = await crmRequest(
+      '/api/v1/integrations/manychat/pre-sales/change-holder',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          documentoCliente: updatePayload.documentoCliente,
+          nome: updatePayload.nome,
+          documentoNovo:
+            updatePayload.documentoNovo || updatePayload.documentoCliente,
+          dataNascimento: updatePayload.dataNascimento
+        })
+      }
+    );
 
     return json(200, {
       ok: true,
-      message: 'Cliente atualizado com sucesso no Easy.',
-      sentPayload: preview.updatePayload,
-      easyResponse: response,
-      tentouOutroDocFlag: tentouOutroDocResponse,
+      message: 'Cliente atualizado com sucesso no CRM.',
+      sentPayload: updatePayload,
+      crmResponse,
+      attemptedAnotherDocument:
+        crmResponse?.tentouOutroDocumento === true,
       audit: {
         confirmedAt: new Date().toISOString(),
         documentoAtual: preview.documentoAtual,
-        updateMode: preview.updateMode
+        updateMode: preview.updateMode,
+        preSaleId: crmResponse?.preSaleId || null,
+        preSaleCode: crmResponse?.preSaleCode || null
       }
     });
   } catch (error) {
